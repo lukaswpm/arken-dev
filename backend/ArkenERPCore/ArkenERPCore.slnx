@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ArkenERP.Lib/ArkenERP.Lib.csproj" />
+  <Project Path="ArkenERPCore/ArkenERP.Core.csproj" />
+</Solution>

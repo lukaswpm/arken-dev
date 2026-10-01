@@ -1,0 +1,40 @@
+services:
+  db-mysql:
+    image: mysql:latest
+    container_name: arken_dev_mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: TC42UD4q7UiwQKb0vgA7UE504sogdaoS
+      MYSQL_DATABASE: arken_manage
+      MYSQL_USER: arken_user
+      MYSQL_PASSWORD: GbcL9c1hw98YiZgCT4h1w9j86G306EWQ
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db/mysql_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+
+  # Banco para Agentes e Operações Complexas (Maestro da Federação)
+  db-postgres:
+    build: db/postgre/
+    container_name: arken_dev_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: arken_runtime
+      POSTGRES_USER: arken_user
+      POSTGRES_PASSWORD: oawR731Ps68y06KPEgsEM0MRgB0eF66X
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 2G 
+
+volumes:
+  mysql_data:
+  postgres_data:
