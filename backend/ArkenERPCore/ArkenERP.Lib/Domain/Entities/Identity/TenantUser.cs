@@ -1,4 +1,4 @@
-﻿using ArkenERP.Lib.Domain.Entities.Tenancy;
+using ArkenERP.Lib.Domain.Entities.Tenancy;
 using System.Data;
 
 namespace ArkenERP.Lib.Domain.Entities.Identity
@@ -7,6 +7,7 @@ namespace ArkenERP.Lib.Domain.Entities.Identity
     {
         public Guid Id { get; private set; }
         public Guid TenantId { get; private set; }
+        public Guid UserId { get; private set; }
 
         public Guid? RoleId { get; private set; }
 
@@ -23,5 +24,18 @@ namespace ArkenERP.Lib.Domain.Entities.Identity
         public virtual Role? Role { get; private set; }
 
         private TenantUser() { }
+
+        public static TenantUser Create(Guid tenantId, Guid userId, Guid? roleId = null, string status = "active")
+        {
+            return new TenantUser
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                UserId = userId,
+                RoleId = roleId,
+                Status = status,
+                JoinedAt = DateTime.UtcNow
+            };
+        }
     }
 }

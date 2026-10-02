@@ -31,6 +31,8 @@ export interface AIAssistantDrawerProps {
   onClose?: () => void
 }
 
+import { aiService } from '../../../services'
+
 export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = () => {
   const [inputMessage, setInputMessage] = useState('')
   const [showSql, setShowSql] = useState(false)
@@ -65,7 +67,7 @@ LIMIT 5;`,
     },
   ])
 
-  const handleSend = (text?: string) => {
+  const handleSend = async (text?: string) => {
     const query = text || inputMessage.trim()
     if (!query) return
 
@@ -80,6 +82,24 @@ LIMIT 5;`,
 
     setMessages((prev) => [...prev, userMsg])
     setInputMessage('')
+
+    try {
+      const res = await aiService.chat(query)
+      if (res?.response) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newAssistantId,
+            role: 'assistant',
+            content: res.response,
+            showActions: true,
+          },
+        ])
+        return
+      }
+    } catch {
+      // Fallback amigável se a API estiver indisponível
+    }
 
     setTimeout(() => {
       let aiResponse: ChatMessage

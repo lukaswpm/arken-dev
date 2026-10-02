@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Box, Typography, IconButton, Avatar } from '@mui/material'
+import React, { useState, useEffect } from 'react'
+import { Box, Typography, IconButton, Avatar, LinearProgress } from '@mui/material'
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
@@ -26,9 +26,35 @@ import {
   type SaleItem,
   type ProductItem,
 } from '../framework'
+import { dashboardService, type DashboardSummaryResponse } from '../services'
 
 export const DashboardPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('Últimos 30 dias')
+  const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadDashboard() {
+      setIsLoading(true)
+      try {
+        const data = await dashboardService.getSummary()
+        if (isMounted && data) {
+          setSummary(data)
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar resumo do dashboard. Usando dados locais.', err)
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+    loadDashboard()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Table columns definition for Vendas Recentes
   const salesColumns = [
@@ -90,9 +116,16 @@ export const DashboardPage: React.FC = () => {
       render: (item: ProductItem) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Avatar
-            src={item.image}
+            src={item.image || (item as any).imageUrl || '/images/notebook.jpg'}
             alt={item.name}
             variant="rounded"
+            slotProps={{
+              img: {
+                onError: (e: any) => {
+                  e.currentTarget.src = '/images/notebook.jpg'
+                },
+              },
+            }}
             sx={{
               width: 28,
               height: 28,
@@ -146,7 +179,22 @@ export const DashboardPage: React.FC = () => {
   ]
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
+      {isLoading && (
+        <LinearProgress
+          sx={{
+            position: 'absolute',
+            top: -12,
+            left: 0,
+            right: 0,
+            height: 3,
+            borderRadius: '2px',
+            bgcolor: '#eff6ff',
+            zIndex: 10,
+            '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' },
+          }}
+        />
+      )}
       {/* Welcome Banner + Date Filter */}
       <Box
         sx={{
@@ -219,36 +267,39 @@ export const DashboardPage: React.FC = () => {
             }}
           >
             <KpiCard
-              label={initialMetrics[0].label}
-              value={initialMetrics[0].value}
-              change={initialMetrics[0].change}
-              caption={initialMetrics[0].caption}
-              tone={initialMetrics[0].tone}
+              label={summary?.metrics[0]?.label || initialMetrics[0].label}
+              value={summary?.metrics[0]?.value || initialMetrics[0].value}
+              change={summary?.metrics[0]?.change || initialMetrics[0].change}
+              trendDirection={summary?.metrics[0]?.trendDirection || 'up'}
+              caption={summary?.metrics[0]?.caption || initialMetrics[0].caption}
+              tone={summary?.metrics[0]?.tone || initialMetrics[0].tone}
               icon={<ShoppingCartOutlinedIcon />}
             />
             <KpiCard
-              label={initialMetrics[1].label}
-              value={initialMetrics[1].value}
-              change={initialMetrics[1].change}
-              caption={initialMetrics[1].caption}
-              tone={initialMetrics[1].tone}
+              label={summary?.metrics[1]?.label || initialMetrics[1].label}
+              value={summary?.metrics[1]?.value || initialMetrics[1].value}
+              change={summary?.metrics[1]?.change || initialMetrics[1].change}
+              trendDirection={summary?.metrics[1]?.trendDirection || 'up'}
+              caption={summary?.metrics[1]?.caption || initialMetrics[1].caption}
+              tone={summary?.metrics[1]?.tone || initialMetrics[1].tone}
               icon={<Inventory2OutlinedIcon />}
             />
             <KpiCard
-              label={initialMetrics[2].label}
-              value={initialMetrics[2].value}
-              change={initialMetrics[2].change}
-              caption={initialMetrics[2].caption}
-              tone={initialMetrics[2].tone}
+              label={summary?.metrics[2]?.label || initialMetrics[2].label}
+              value={summary?.metrics[2]?.value || initialMetrics[2].value}
+              change={summary?.metrics[2]?.change || initialMetrics[2].change}
+              trendDirection={summary?.metrics[2]?.trendDirection || 'up'}
+              caption={summary?.metrics[2]?.caption || initialMetrics[2].caption}
+              tone={summary?.metrics[2]?.tone || initialMetrics[2].tone}
               icon={<PeopleAltOutlinedIcon />}
             />
             <KpiCard
-              label={initialMetrics[3].label}
-              value={initialMetrics[3].value}
-              change={initialMetrics[3].change}
-              caption={initialMetrics[3].caption}
-              tone={initialMetrics[3].tone}
-              isNegative={initialMetrics[3].isNegative}
+              label={summary?.metrics[3]?.label || initialMetrics[3].label}
+              value={summary?.metrics[3]?.value || initialMetrics[3].value}
+              change={summary?.metrics[3]?.change || initialMetrics[3].change}
+              trendDirection={summary?.metrics[3]?.trendDirection || 'up'}
+              caption={summary?.metrics[3]?.caption || initialMetrics[3].caption}
+              tone={summary?.metrics[3]?.tone || initialMetrics[3].tone}
               icon={<Inventory2OutlinedIcon />}
             />
           </Box>
@@ -284,14 +335,17 @@ export const DashboardPage: React.FC = () => {
                 </Box>
               }
             >
-              <AreaLineChart data={revenueData} height={175} />
+              <AreaLineChart
+                data={summary?.revenueData?.length ? summary.revenueData : revenueData}
+                height={175}
+              />
             </SectionCard>
 
             {/* Vendas por Categoria Chart Card */}
             <SectionCard title="Vendas por Categoria">
               <DonutChart
-                categories={categoryShares}
-                totalValue="R$ 48.532,80"
+                categories={summary?.categoryShares?.length ? summary.categoryShares : categoryShares}
+                totalValue={summary?.metrics[0]?.value || "R$ 48.532,80"}
                 totalLabel="Total"
               />
             </SectionCard>
@@ -313,7 +367,8 @@ export const DashboardPage: React.FC = () => {
             >
               <DataTable
                 columns={salesColumns}
-                data={recentSales}
+                data={summary?.recentSales?.length ? (summary.recentSales as any) : recentSales}
+                loading={isLoading}
                 keyExtractor={(item) => item.id}
               />
             </SectionCard>
@@ -326,7 +381,8 @@ export const DashboardPage: React.FC = () => {
             >
               <DataTable
                 columns={productColumns}
-                data={featuredProducts}
+                data={summary?.featuredProducts?.length ? (summary.featuredProducts as any) : featuredProducts}
+                loading={isLoading}
                 keyExtractor={(item) => item.id}
               />
             </SectionCard>

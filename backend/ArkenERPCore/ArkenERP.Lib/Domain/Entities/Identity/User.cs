@@ -1,4 +1,4 @@
-﻿using ArkenERP.Lib.Domain.Entities.Base;
+using ArkenERP.Lib.Domain.Entities.Base;
 
 namespace ArkenERP.Lib.Domain.Entities.Identity
 {
@@ -29,13 +29,20 @@ namespace ArkenERP.Lib.Domain.Entities.Identity
         public static User Create(
             string email,
             string username,
-            string passwordHash)
+            string passwordHash,
+            string? firstName = null,
+            string? lastName = null,
+            string? avatarUrl = null)
         {
             return new User
             {
                 Email = email,
                 Username = username,
-                PasswordHash = passwordHash
+                PasswordHash = passwordHash,
+                FirstName = firstName,
+                LastName = lastName,
+                AvatarUrl = avatarUrl,
+                IsActive = true
             };
         }
     }

@@ -1,7 +1,8 @@
-﻿using ArkenERP.Lib.Domain.Entities.ERP;
+using ArkenERP.Lib.Domain.Entities.ERP;
 using ArkenERP.Lib.Domain.Entities.Identity;
 using ArkenERP.Lib.Domain.Entities.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using System.Reflection.Emit;
 
 namespace ArkenERP.Lib.Context
@@ -27,6 +28,7 @@ namespace ArkenERP.Lib.Context
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,6 +38,13 @@ namespace ArkenERP.Lib.Context
                 typeof(ManagerDbContext).Assembly,
                 type => type.Namespace != null && type.Namespace.Contains("Configurations.Manager")
             );
+
+            modelBuilder.Entity<Tenant>()
+                .Property(tenant => tenant.SettingsJson)
+                .HasConversion(
+                    settings => JsonSerializer.Serialize(settings),
+                    settingsJson => JsonSerializer.Deserialize<TenantSettings>(settingsJson))
+                .HasColumnType("json");
 
             ApplySnakeCase(modelBuilder);
         }

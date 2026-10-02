@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Box,
   Typography,
@@ -14,6 +14,7 @@ import {
   MenuItem,
   type SelectChangeEvent,
   Select,
+  LinearProgress,
 } from '@mui/material'
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
@@ -45,17 +46,64 @@ import {
   salesCategoryShares,
   type OrderItem,
 } from '../framework'
+import { salesService, type SalesKpiResponse } from '../services'
 
 export const SalesPage: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState('01/07/2025 - 31/07/2025')
+  const [orders, setOrders] = useState<OrderItem[]>(salesOrders)
+  const [kpisData, setKpisData] = useState<SalesKpiResponse | null>(null)
+  const [evolutionVendas, setEvolutionVendas] = useState(salesEvolutionVendas)
+  const [evolutionTicket, setEvolutionTicket] = useState(salesEvolutionTicket)
+  const [categoryShares, setCategoryShares] = useState(salesCategoryShares)
+  const [selectedPeriod, setSelectedPeriod] = useState('Últimos 30 dias')
   const [activeTab, setActiveTab] = useState('Todos')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   const [selectedOrderForPreview, setSelectedOrderForPreview] = useState<string>('#000128')
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Carrega pedidos e KPIs de vendas dinamicamente da API
+  useEffect(() => {
+    let isMounted = true
+    async function loadSales() {
+      setIsLoading(true)
+      try {
+        const [ordersRes, kpisRes] = await Promise.allSettled([
+          salesService.getSales(),
+          salesService.getSalesKpis(),
+        ])
+        if (!isMounted) return
+
+        if (ordersRes.status === 'fulfilled' && ordersRes.value?.length) {
+          setOrders(ordersRes.value)
+          setSelectedOrderForPreview(ordersRes.value[0].orderNumber)
+        }
+        if (kpisRes.status === 'fulfilled' && kpisRes.value) {
+          setKpisData(kpisRes.value)
+          if (kpisRes.value.evolutionVendas?.length) {
+            setEvolutionVendas(kpisRes.value.evolutionVendas)
+          }
+          if (kpisRes.value.evolutionTicket?.length) {
+            setEvolutionTicket(kpisRes.value.evolutionTicket)
+          }
+          if (kpisRes.value.categoryShares?.length) {
+            setCategoryShares(kpisRes.value.categoryShares)
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar dados de vendas do backend. Usando dados locais.', err)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+    loadSales()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Filter orders based on active tab and search
-  const filteredOrders = salesOrders.filter((order) => {
+  const filteredOrders = orders.filter((order) => {
     if (activeTab === 'Em andamento' && order.status !== 'Em andamento') return false
     if (activeTab === 'Concluídos' && order.status !== 'Concluído') return false
     if (activeTab === 'Cancelados' && order.status !== 'Cancelado') return false
@@ -334,32 +382,36 @@ export const SalesPage: React.FC = () => {
           >
             <KpiCard
               label="Total de Vendas"
-              value="R$ 48.532,80"
-              change="12,5%"
+              value={kpisData?.totalSales || "R$ 48.532,80"}
+              change={kpisData ? `${kpisData.salesDeltaPct >= 0 ? '+' : ''}${kpisData.salesDeltaPct}%` : "12,5%"}
+              trendDirection={kpisData?.salesDeltaDirection || "up"}
               caption="em relação ao período anterior"
               tone="green"
               icon={<ShoppingCartOutlinedIcon />}
             />
             <KpiCard
               label="Total de Pedidos"
-              value="128"
+              value={kpisData?.ordersCount ? kpisData.ordersCount.toString() : "128"}
               change="8,3%"
+              trendDirection="up"
               caption="em relação ao período anterior"
               tone="blue"
               icon={<DescriptionOutlinedIcon />}
             />
             <KpiCard
               label="Ticket Médio"
-              value="R$ 379,94"
+              value={kpisData?.averageTicket || "R$ 379,94"}
               change="6,7%"
+              trendDirection="up"
               caption="em relação ao período anterior"
               tone="purple"
               icon={<ReceiptLongOutlinedIcon />}
             />
             <KpiCard
-              label="Produtos Vendidos"
-              value="342"
-              change="9,2%"
+              label="Taxa de Conversão"
+              value={kpisData ? `${kpisData.conversionRate}%` : "88.9%"}
+              change="5,4%"
+              trendDirection="up"
               caption="em relação ao período anterior"
               tone="blue"
               icon={<LocalOfferOutlinedIcon />}
@@ -395,8 +447,8 @@ export const SalesPage: React.FC = () => {
               }
             >
               <AreaLineChart
-                data={salesEvolutionVendas}
-                secondaryData={salesEvolutionTicket}
+                data={evolutionVendas.length ? evolutionVendas : salesEvolutionVendas}
+                secondaryData={evolutionTicket.length ? evolutionTicket : salesEvolutionTicket}
                 height={175}
               />
             </SectionCard>
@@ -404,8 +456,8 @@ export const SalesPage: React.FC = () => {
             {/* Vendas por Categoria Card */}
             <SectionCard title="Vendas por Categoria">
               <DonutChart
-                categories={salesCategoryShares}
-                totalValue="R$ 48.532,80"
+                categories={categoryShares.length ? categoryShares : salesCategoryShares}
+                totalValue={kpisData?.totalSales || "R$ 48.532,80"}
                 totalLabel="Total"
               />
             </SectionCard>
@@ -422,8 +474,23 @@ export const SalesPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: 1.5,
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
+            {isLoading && (
+              <LinearProgress
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 3,
+                  bgcolor: '#eff6ff',
+                  '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' },
+                }}
+              />
+            )}
             {/* Toolbar: Tabs + Search & Filters */}
             <Box
               sx={{
@@ -521,6 +588,7 @@ export const SalesPage: React.FC = () => {
             <DataTable
               columns={columns}
               data={filteredOrders}
+              loading={isLoading}
               keyExtractor={(item) => item.id}
             />
 

@@ -1,75 +1,91 @@
-# React + TypeScript + Vite
+# ArkenERP Lite - Documentação Técnica
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicação web moderna de gestão empresarial (ERP) construída com arquitetura de **Mini-Framework Modular**, foco em alta fidelidade visual, consistência de design e recursos inteligentes orientados por IA.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Tecnologias Utilizadas
 
-## React Compiler
+- **Core**: React 19, TypeScript 5, Vite 8
+- **Design System & UI**: Material UI (MUI v6) com `@emotion/react` e `@emotion/styled`
+- **Ícones**: `@mui/icons-material`
+- **Roteamento**: `react-router-dom` v6
+- **Tipografia**: Família *Inter* e *Roboto*
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🏛️ Arquitetura: Mini-Framework (`src/framework`)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+O projeto é estruturado em torno de um mini-framework reutilizável que desacopla a apresentação, regras de tema e modelos de dados, permitindo acelerar o desenvolvimento de novos módulos mantendo uniformidade visual estrita.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+src/framework/
+├── index.ts                  # Barrel export centralizado de componentes e modelos
+├── theme/                    # Design tokens e customização do tema MUI
+│   ├── tokens.ts             # Cores HSL, gradientes, bordas e tipografia
+│   └── theme.ts              # Overrides dos componentes base do MUI
+├── components/
+│   ├── layout/               # ArkenLayout, Sidebar colapsável, Topbar dinâmica
+│   ├── kpi/                  # KpiCard com setas semânticas e suporte a 5 tonalidades
+│   ├── cards/                # SectionCard, ActionCard, OrderDetailsCard, ProductDetailCard, CustomerDetailCard
+│   ├── tables/               # DataTable genérico, StatusChip padronizado com cores semânticas
+│   ├── charts/               # AreaLineChart, DonutChart, HorizontalBarChart, CashFlowChart
+│   ├── ai/                   # AIAssistantDrawer, SalesAICard, FinanceAICard
+│   └── filters/              # DateRangeSelect com presets temporais
+└── data/                     # Modelos de dados e mocks fortemente tipados
+    ├── mockData.ts           # Métricas e transações do Dashboard
+    ├── salesMockData.ts      # Pedidos e histórico de faturamento
+    ├── productsMockData.ts   # Catálogo completo com 10 produtos e fotos reais
+    ├── financialMockData.ts  # Fluxo de caixa diário, contas a pagar e receber
+    └── customersMockData.ts  # Catálogo com 10 clientes, documentos, avatares e métricas
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 📱 Telas Implementadas
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Rota | Módulo | Descrição dos Recursos |
+|---|---|---|
+| `/dashboard` | **Dashboard** | 4 KPIs executivos, gráfico de faturamento semestral, gráfico em rosca de categorias, pedidos recentes e atalhos rápidos. |
+| `/sales` | **Vendas** | Indicadores de conversão, tabela de pedidos com filtros de status/datas, detalhes do pedido (`OrderDetailsCard`) e card preditivo de vendas (`SalesAICard`). |
+| `/products` | **Produtos** | Gestão de inventário com alternância Lista/Grade, filtros por categoria/status, fotos de alta qualidade e painel lateral com ficha técnica (`ProductDetailCard`). |
+| `/finance` | **Financeiro** | Painel de fluxo de caixa diário (Entradas vs Saídas e Saldo), tabelas paralelas de Contas a Pagar/Receber, fornecedores líderes, títulos em atraso e IA de diagnóstico financeiro (`FinanceAICard`). |
+| `/customers` | **Clientes** | Tabela rica com avatares dedicados (fotos de estúdio e iniciais), documentos formatados, cidades capixabas, seleção dinâmica e painel lateral (`CustomerDetailCard`) com produtos mais comprados, insights preditivos e prompt de IA interativo. |
 
+---
+
+## 🎨 Boas Práticas e Padrões Estabelecidos
+
+1. **Separação de Checkboxes e Conteúdo**:
+   Todas as tabelas utilizam largura fixa na coluna de checkbox (`width: 38`, `pl: 1.25`) e recuo generoso na coluna adjacente (`pl: 2` / ~16px), garantindo que o checkbox nunca encoste no texto ou avatar.
+
+2. **StatusChip Semântico**:
+   Centralização de cores de status em `StatusChip.tsx` com tratamento nativo para:
+   - `Ativo`, `Concluído`, `Pago`, `Em estoque` → Fundo verde claro e texto verde escuro.
+   - `Inativo`, `Pendente`, `Estoque baixo` → Fundo âmbar claro e texto âmbar escuro.
+   - `Cancelado`, `Sem estoque` → Fundo vermelho claro e texto vermelho escuro.
+
+3. **Topbar com Busca Contextual Inteligente**:
+   O campo de busca global ajusta seu *placeholder* automaticamente de acordo com o módulo ativo na URL.
+
+4. **Imagens Reais e Assets Otimizados**:
+   Fotografias em alta definição salvas em `/public/images/` para produtos (notebooks, periféricos, acessórios) e avatares executivos (João, Fernanda, Santos, Ana e Lucas).
+
+---
+
+## 🛠️ Comandos de Desenvolvimento
+
+```bash
+# Instalar dependências
+npm install
+
+# Rodar servidor de desenvolvimento (Vite com HMR)
+npm run dev
+
+# Checagem de tipos TypeScript e compilação para produção
+npm run build
 ```
+
+---
+
+> Para a documentação técnica expandida com diagrama de arquitetura e contratos de dados, consulte o artefato [technical_documentation.md](file:///C:/Users/lukas/.gemini/antigravity-ide/brain/6e112fef-465d-4b95-a3d7-e9c9b98962de/technical_documentation.md).

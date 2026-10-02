@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Box,
   Typography,
@@ -17,6 +17,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  LinearProgress,
+  CircularProgress,
 } from '@mui/material'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -41,8 +43,11 @@ import {
   type CustomerItem,
   type CustomerDetailData,
 } from '../framework'
+import { customerService, type CustomerKpi } from '../services'
 
 export const CustomersPage: React.FC = () => {
+  const [customers, setCustomers] = useState<CustomerItem[]>(customersData)
+  const [kpiMetrics, setKpiMetrics] = useState<CustomerKpi[]>(customersKpiMetrics)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('Todos os status')
   const [selectedCity, setSelectedCity] = useState('Todas as cidades')
@@ -52,10 +57,48 @@ export const CustomersPage: React.FC = () => {
   const [selectedCustomerForDetail, setSelectedCustomerForDetail] = useState<CustomerDetailData>(
     defaultCustomerDetail
   )
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Carrega clientes e KPIs dinamicamente da API
+  useEffect(() => {
+    let isMounted = true
+    async function loadCustomers() {
+      setIsLoading(true)
+      try {
+        const [custData, kpiData] = await Promise.allSettled([
+          customerService.getCustomers(),
+          customerService.getCustomerKpis(),
+        ])
+        if (!isMounted) return
+
+        if (custData.status === 'fulfilled' && custData.value?.length) {
+          setCustomers(custData.value)
+          try {
+            const detail = await customerService.getCustomerById(custData.value[0].id)
+            if (isMounted && detail) setSelectedCustomerForDetail(detail)
+          } catch {
+            // fallback silencioso para detail local
+          }
+        }
+        if (kpiData.status === 'fulfilled' && kpiData.value?.length) {
+          setKpiMetrics(kpiData.value)
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar clientes do backend. Usando dados locais.', err)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+    loadCustomers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Map CustomerItem to CustomerDetailData when clicking on a customer in the list
-  const handleSelectCustomer = (customer: CustomerItem) => {
-    setSelectedCustomerForDetail({
+  const handleSelectCustomer = async (customer: CustomerItem) => {
+    setSelectedCustomerForDetail(prev => ({
+      ...prev,
       id: customer.id,
       name: customer.name,
       status: customer.status,
@@ -66,23 +109,25 @@ export const CustomersPage: React.FC = () => {
       customerSince: customer.customerSince || '15/03/2023',
       initials: customer.initials,
       avatarColor: customer.avatarColor,
-      avatarImage: customer.avatarImage,
+      avatarImage: customer.avatarImage || (customer as any).avatarUrl,
       totalSpent: customer.totalSpent,
       lastPurchase: customer.lastPurchase,
-      averageTicket: 'R$ 3.742,00',
-      topProducts: defaultCustomerDetail.topProducts,
-      aiInsights: [
-        `Este cliente aumentou o volume de compras em 35% nos últimos 90 dias.`,
-        `Os produtos da categoria de informática representam 78% do seu total de compras.`,
-        `Última compra foi há 5 dias, e o comportamento indica alta probabilidade de nova compra em até 30 dias.`,
-      ],
-    })
+    }))
+
+    try {
+      const detail = await customerService.getCustomerById(customer.id)
+      if (detail) {
+        setSelectedCustomerForDetail(detail)
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar perfil detalhado do cliente:', err)
+    }
   }
 
   // Handle row checkboxes
   const handleToggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedCustomerIds(customersData.map((c) => c.id))
+      setSelectedCustomerIds(customers.map((c) => c.id))
     } else {
       setSelectedCustomerIds([])
     }
@@ -96,7 +141,7 @@ export const CustomersPage: React.FC = () => {
   }
 
   // Filter customers
-  const filteredCustomers = customersData.filter((c) => {
+  const filteredCustomers = customers.filter((c) => {
     if (selectedStatus !== 'Todos os status' && c.status !== selectedStatus) {
       return false
     }
@@ -251,7 +296,7 @@ export const CustomersPage: React.FC = () => {
               gap: 1.5,
             }}
           >
-            {customersKpiMetrics.map((kpi, index) => (
+            {kpiMetrics.map((kpi, index) => (
               <KpiCard
                 key={kpi.label}
                 label={kpi.label}
@@ -409,8 +454,22 @@ export const CustomersPage: React.FC = () => {
               border: '1px solid #e2e8f0',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
               overflow: 'hidden',
+              position: 'relative',
             }}
           >
+            {isLoading && (
+              <LinearProgress
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 3,
+                  bgcolor: '#eff6ff',
+                  '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' },
+                }}
+              />
+            )}
             <TableContainer sx={{ overflowX: 'auto' }}>
               <Table
                 sx={{
@@ -475,9 +534,29 @@ export const CustomersPage: React.FC = () => {
                 </TableHead>
 
                 <TableBody>
-                  {filteredCustomers.map((cust) => {
-                    const isSelected = selectedCustomerIds.includes(cust.id)
-                    const isCurrentDetail = selectedCustomerForDetail.id === cust.id
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                          <CircularProgress size={24} sx={{ color: '#2563eb' }} />
+                          <Typography sx={{ color: '#64748b', fontSize: '0.8125rem', fontWeight: 500 }}>
+                            Carregando clientes do ArkenERP...
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredCustomers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                        <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                          Nenhum cliente encontrado
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCustomers.map((cust) => {
+                      const isSelected = selectedCustomerIds.includes(cust.id)
+                      const isCurrentDetail = selectedCustomerForDetail.id === cust.id
 
                     return (
                       <TableRow
@@ -523,9 +602,9 @@ export const CustomersPage: React.FC = () => {
                         {/* Cliente Cell - ample left padding to separate from checkbox */}
                         <TableCell sx={{ pl: 2 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                            {cust.avatarImage ? (
+                            {cust.avatarImage || (cust as any).avatarUrl ? (
                               <Avatar
-                                src={cust.avatarImage}
+                                src={cust.avatarImage || (cust as any).avatarUrl}
                                 alt={cust.name}
                                 sx={{
                                   width: 28,
@@ -627,7 +706,7 @@ export const CustomersPage: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     )
-                  })}
+                  }))}
                 </TableBody>
               </Table>
             </TableContainer>

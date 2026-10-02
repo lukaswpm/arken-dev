@@ -9,7 +9,11 @@
 *.user
 *.userosscache
 *.sln.docstates
+.env
+.env.*
 *.env
+*.env.*
+!.env.example
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -427,3 +431,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Database runtime data (Docker volumes)
+db/mysql_data/
+db/postgres_data/

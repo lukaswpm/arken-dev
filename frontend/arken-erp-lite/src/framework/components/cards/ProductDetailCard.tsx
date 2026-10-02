@@ -100,7 +100,10 @@ export const ProductDetailCard: React.FC<ProductDetailCardProps> = ({
       >
         <Box
           component="img"
-          src={product.image}
+          src={product.image || (product as any).imageUrl || '/images/notebook.jpg'}
+          onError={(e: any) => {
+            e.currentTarget.src = '/images/notebook.jpg'
+          }}
           alt={product.name}
           sx={{
             width: '100%',

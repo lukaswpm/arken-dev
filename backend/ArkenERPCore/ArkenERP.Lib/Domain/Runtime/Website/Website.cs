@@ -1,11 +1,11 @@
-﻿using ArkenAPI.Domain.Entities.Base;
+using ArkenERP.Lib.Domain.Entities.Base;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ArkenAPI.Domain.Runtime.Website
+namespace ArkenERP.Lib.Domain.Runtime.Website
 {
     public sealed class Website : Entity
     {

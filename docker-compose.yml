@@ -9,7 +9,7 @@ services:
       MYSQL_USER: arken_user
       MYSQL_PASSWORD: GbcL9c1hw98YiZgCT4h1w9j86G306EWQ
     ports:
-      - "3306:3306"
+      - "3308:3306"
     volumes:
       - ./db/mysql_data:/var/lib/mysql
     deploy:
@@ -27,7 +27,7 @@ services:
       POSTGRES_USER: arken_user
       POSTGRES_PASSWORD: oawR731Ps68y06KPEgsEM0MRgB0eF66X
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./db/postgres_data:/var/lib/postgresql/data
     deploy:

@@ -1,4 +1,4 @@
-﻿using ArkenERP.Lib.Domain.Entities.Base;
+using ArkenERP.Lib.Domain.Entities.Base;
 using ArkenERP.Lib.Domain.Enums;
 using System;
 using System.Collections.Generic;
@@ -32,6 +32,68 @@ namespace ArkenERP.Lib.Domain.Entities.ERP
         public void GenerateCode()
         {
             Code = $"{Name.Substring(0, 3).ToUpper()}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}";
+        }
+
+        public static Product Create(
+            string name,
+            string description,
+            string code,
+            decimal price,
+            Guid productCategoryId,
+            int stockQuantity,
+            string? brand = null,
+            string? model = null,
+            string? imageUrl = null,
+            ProductStatus status = ProductStatus.Active,
+            string? sku = null)
+        {
+            var product = new Product
+            {
+                Name = name,
+                Description = description,
+                Code = code,
+                Price = price,
+                ProductCategoryId = productCategoryId,
+                StockQuantity = stockQuantity,
+                Brand = brand,
+                Model = model,
+                ImageUrl = imageUrl,
+                Status = status
+            };
+
+            if (string.IsNullOrWhiteSpace(sku))
+                product.GenerateSKU();
+            else
+                product.SKU = sku;
+
+            return product;
+        }
+
+        public void Update(
+            string name,
+            string description,
+            decimal price,
+            Guid productCategoryId,
+            int stockQuantity,
+            string? brand = null,
+            string? model = null,
+            string? imageUrl = null,
+            ProductStatus? status = null)
+        {
+            Name = name;
+            Description = description;
+            Price = price;
+            ProductCategoryId = productCategoryId;
+            StockQuantity = stockQuantity;
+            if (brand != null) Brand = brand;
+            if (model != null) Model = model;
+            if (imageUrl != null) ImageUrl = imageUrl;
+            if (status.HasValue) Status = status.Value;
+        }
+
+        public void UpdateStock(int newStock)
+        {
+            StockQuantity = Math.Max(0, newStock);
         }
     }
 }

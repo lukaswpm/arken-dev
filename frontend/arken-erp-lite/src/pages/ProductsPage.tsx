@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Box,
   Typography,
@@ -6,7 +6,6 @@ import {
   InputBase,
   Checkbox,
   IconButton,
-  Tooltip,
   Card,
   Select,
   MenuItem,
@@ -14,6 +13,14 @@ import {
   Avatar,
   Chip,
   Menu,
+  LinearProgress,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
 } from '@mui/material'
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
@@ -26,11 +33,11 @@ import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded'
 import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded'
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 
 import {
   KpiCard,
@@ -40,8 +47,28 @@ import {
   catalogProducts,
   type CatalogProduct,
 } from '../framework'
+import { productService, type ProductKpi, type ProductCategoryItem } from '../services'
+
+// Galeria de imagens disponíveis na pasta public/images/
+const AVAILABLE_IMAGES = [
+  { label: 'Notebook Dell', src: '/images/notebook.jpg' },
+  { label: 'Smartphone Galaxy', src: '/images/smartphone.jpg' },
+  { label: 'Camiseta Premium', src: '/images/tshirt.jpg' },
+  { label: 'Fone Bluetooth', src: '/images/headphones.jpg' },
+  { label: 'Cafeteira Elétrica', src: '/images/coffeemaker.jpg' },
+  { label: 'Mouse Sem Fio', src: '/images/mouse.jpg' },
+  { label: 'Teclado Mecânico', src: '/images/keyboard.jpg' },
+  { label: 'Monitor Full HD', src: '/images/monitor.jpg' },
+  { label: 'SSD 1TB', src: '/images/ssd.jpg' },
+  { label: 'Webcam Full HD', src: '/images/webcam.jpg' },
+  { label: 'Dell Inspiron Hero', src: '/images/dell_hero.jpg' },
+  { label: 'Cabo USB-C', src: '/images/cable.jpg' },
+]
 
 export const ProductsPage: React.FC = () => {
+  const [products, setProducts] = useState<CatalogProduct[]>(catalogProducts)
+  const [kpis, setKpis] = useState<ProductKpi[]>([])
+  const [categories, setCategories] = useState<ProductCategoryItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState('Todas as categorias')
   const [selectedStatus, setSelectedStatus] = useState('Todos os status')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
@@ -52,8 +79,62 @@ export const ProductsPage: React.FC = () => {
   )
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null)
 
+  // Loading state
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Modal de Criação / Edição de Produto
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: '',
+    code: '',
+    sku: '',
+    price: '',
+    stockQuantity: '10',
+    brand: '',
+    model: '',
+    imageUrl: '/images/notebook.jpg',
+  })
+
+  // Carrega produtos, KPIs e categorias dinamicamente da API
+  const fetchProductsData = async () => {
+    setIsLoading(true)
+    try {
+      const [prodsData, kpisData, catsData] = await Promise.allSettled([
+        productService.getProducts(),
+        productService.getProductKpis(),
+        productService.getCategories(),
+      ])
+
+      if (prodsData.status === 'fulfilled' && prodsData.value?.length) {
+        setProducts(prodsData.value)
+        setSelectedProductForDetail(prodsData.value[0])
+      }
+      if (kpisData.status === 'fulfilled' && kpisData.value?.length) {
+        setKpis(kpisData.value)
+      }
+      if (catsData.status === 'fulfilled' && catsData.value?.length) {
+        setCategories(catsData.value)
+      }
+    } catch (err) {
+      console.warn('Backend offline ou erro ao carregar produtos. Usando dados locais.', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProductsData()
+  }, [])
+
   // Filter products based on category, status, and search query
-  const filteredProducts = catalogProducts.filter((prod) => {
+  const filteredProducts = products.filter((prod) => {
     if (
       selectedCategory !== 'Todas as categorias' &&
       prod.category !== selectedCategory
@@ -74,8 +155,8 @@ export const ProductsPage: React.FC = () => {
     return true
   })
 
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
       setSelectedProductIds(filteredProducts.map((p) => p.id))
     } else {
       setSelectedProductIds([])
@@ -83,31 +164,134 @@ export const ProductsPage: React.FC = () => {
   }
 
   const handleSelectOne = (id: string) => {
-    setSelectedProductIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    )
+    if (selectedProductIds.includes(id)) {
+      setSelectedProductIds(selectedProductIds.filter((item) => item !== id))
+    } else {
+      setSelectedProductIds([...selectedProductIds, id])
+    }
   }
 
-  // Table columns definition
+  // Abertura do Modal de Novo Produto
+  const handleOpenCreateModal = () => {
+    setFormError(null)
+    setIsEditing(false)
+    setEditingId(null)
+    setFormData({
+      name: '',
+      description: '',
+      category: categories[0]?.name || 'Eletrônicos',
+      code: `PRD-${Math.floor(100 + Math.random() * 900)}`,
+      sku: `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+      price: '199.90',
+      stockQuantity: '20',
+      brand: 'Arken',
+      model: 'Padrão',
+      imageUrl: '/images/notebook.jpg',
+    })
+    setIsModalOpen(true)
+  }
+
+  // Abertura do Modal de Edição
+  const handleOpenEditModal = (product: CatalogProduct) => {
+    setFormError(null)
+    setIsEditing(true)
+    setEditingId(product.id)
+
+    // Extrai número do preço (ex: "R$ 2.500,00" -> "2500")
+    const cleanPrice = product.price.replace(/[^\d,]/g, '').replace(',', '.')
+
+    setFormData({
+      name: product.name,
+      description: product.subtitle || '',
+      category: product.category,
+      code: product.code,
+      sku: product.code ? `SKU-${product.code}` : '',
+      price: cleanPrice || '100.00',
+      stockQuantity: String(product.stock),
+      brand: 'Arken',
+      model: product.name,
+      imageUrl: product.image || (product as any).imageUrl || '/images/notebook.jpg',
+    })
+    setIsModalOpen(true)
+  }
+
+  // Salvar produto (Create ou Update)
+  const handleSaveProduct = async () => {
+    setFormError(null)
+
+    if (!formData.name.trim()) {
+      setFormError('Informe o nome do produto.')
+      return
+    }
+
+    const priceNum = parseFloat(formData.price.replace(',', '.'))
+    if (isNaN(priceNum) || priceNum <= 0) {
+      setFormError('Informe um preço válido maior que zero.')
+      return
+    }
+
+    const stockNum = parseInt(formData.stockQuantity, 10)
+    if (isNaN(stockNum) || stockNum < 0) {
+      setFormError('Informe uma quantidade de estoque válida.')
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      const selectedCatObj = categories.find((c) => c.name === formData.category)
+
+      const payload = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        categoryId: selectedCatObj?.id,
+        code: formData.code.trim(),
+        sku: formData.sku.trim(),
+        price: priceNum,
+        stockQuantity: stockNum,
+        brand: formData.brand.trim() || 'Arken',
+        model: formData.model.trim() || formData.name.trim(),
+        imageUrl: formData.imageUrl,
+        image: formData.imageUrl,
+      }
+
+      if (isEditing && editingId) {
+        await productService.updateProduct(editingId, payload)
+      } else {
+        await productService.createProduct(payload)
+      }
+
+      await fetchProductsData()
+      setIsModalOpen(false)
+    } catch (err: any) {
+      console.error('Erro ao salvar produto:', err)
+      setFormError(err?.message || 'Falha ao salvar produto no backend.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Columns definition
   const columns = [
     {
-      id: 'select',
+      id: 'selection',
       label: (
         <Checkbox
           size="small"
-          indeterminate={
-            selectedProductIds.length > 0 &&
-            selectedProductIds.length < filteredProducts.length
-          }
           checked={
             filteredProducts.length > 0 &&
             selectedProductIds.length === filteredProducts.length
           }
-          onChange={handleSelectAll}
+          indeterminate={
+            selectedProductIds.length > 0 &&
+            selectedProductIds.length < filteredProducts.length
+          }
+          onChange={(e) => handleSelectAll(e.target.checked)}
           sx={{
             p: 0.5,
             color: '#cbd5e1',
             '&.Mui-checked': { color: '#2563eb' },
+            '&.MuiCheckbox-indeterminate': { color: '#2563eb' },
           }}
         />
       ),
@@ -128,61 +312,71 @@ export const ProductsPage: React.FC = () => {
     {
       id: 'name',
       label: 'Produto',
-      minWidth: 190,
-      render: (item: CatalogProduct) => (
-        <Box
-          onClick={() => setSelectedProductForDetail(item)}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.25,
-            cursor: 'pointer',
-          }}
-        >
-          <Avatar
-            src={item.image}
-            alt={item.name}
-            variant="rounded"
+      minWidth: 200,
+      render: (item: CatalogProduct) => {
+        const itemImg = item.image || (item as any).imageUrl || '/images/notebook.jpg'
+        return (
+          <Box
+            onClick={() => setSelectedProductForDetail(item)}
             sx={{
-              width: 28,
-              height: 28,
-              borderRadius: '6px',
-              bgcolor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              img: { objectFit: 'contain', p: 0.25 },
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.25,
+              cursor: 'pointer',
             }}
-          />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              sx={{
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                color: selectedProductForDetail.id === item.id ? '#2563eb' : '#0f172a',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+          >
+            <Avatar
+              src={itemImg}
+              alt={item.name}
+              variant="rounded"
+              slotProps={{
+                img: {
+                  onError: (e: any) => {
+                    e.currentTarget.src = '/images/notebook.jpg'
+                  },
+                },
               }}
-            >
-              {item.name}
-            </Typography>
-            <Typography
-              variant="caption"
               sx={{
-                color: '#64748b',
-                fontSize: '0.65625rem',
-                display: 'block',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                mt: 0.25,
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
+                bgcolor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                img: { objectFit: 'contain', p: 0.25 },
               }}
-            >
-              {item.subtitle}
-            </Typography>
+            />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  color: selectedProductForDetail.id === item.id ? '#2563eb' : '#0f172a',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {item.name}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#64748b',
+                  fontSize: '0.65625rem',
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  mt: 0.25,
+                }}
+              >
+                {item.subtitle}
+              </Typography>
+            </Box>
           </Box>
-        </Box>
-      ),
+        )
+      },
     },
     {
       id: 'category',
@@ -215,10 +409,10 @@ export const ProductsPage: React.FC = () => {
     },
     {
       id: 'price',
-      label: 'Preço de Venda',
+      label: 'Preço',
       minWidth: 95,
       render: (item: CatalogProduct) => (
-        <Typography sx={{ color: '#334155', fontWeight: 500, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+        <Typography sx={{ color: '#0f172a', fontSize: '0.75rem', fontWeight: 600 }}>
           {item.price}
         </Typography>
       ),
@@ -226,9 +420,15 @@ export const ProductsPage: React.FC = () => {
     {
       id: 'stock',
       label: 'Estoque',
-      minWidth: 60,
+      minWidth: 65,
       render: (item: CatalogProduct) => (
-        <Typography sx={{ color: '#475569', fontSize: '0.75rem', fontWeight: 500 }}>
+        <Typography
+          sx={{
+            color: item.stock === 0 ? '#ef4444' : item.stock <= 10 ? '#f59e0b' : '#10b981',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+          }}
+        >
           {item.stock}
         </Typography>
       ),
@@ -236,34 +436,35 @@ export const ProductsPage: React.FC = () => {
     {
       id: 'status',
       label: 'Status',
-      minWidth: 90,
+      minWidth: 100,
       render: (item: CatalogProduct) => <StatusChip status={item.status} />,
     },
     {
       id: 'actions',
-      label: 'Ações',
+      label: '',
+      minWidth: 65,
       align: 'right' as const,
-      minWidth: 85,
       render: (item: CatalogProduct) => (
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-          <Tooltip title="Ver detalhes">
-            <IconButton
-              size="small"
-              onClick={() => setSelectedProductForDetail(item)}
-              sx={{ color: '#64748b', p: 0.5, '&:hover': { color: '#2563eb' } }}
-            >
-              <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Editar produto">
-            <IconButton size="small" sx={{ color: '#64748b', p: 0.5, '&:hover': { color: '#2563eb' } }}>
-              <EditOutlinedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            size="small"
+            onClick={() => handleOpenEditModal(item)}
+            sx={{
+              p: 0.5,
+              color: '#64748b',
+              '&:hover': { color: '#2563eb', bgcolor: '#eff6ff' },
+            }}
+          >
+            <EditOutlinedIcon sx={{ fontSize: 16 }} />
+          </IconButton>
           <IconButton
             size="small"
             onClick={(e) => setActionMenuAnchor(e.currentTarget)}
-            sx={{ color: '#64748b', p: 0.5 }}
+            sx={{
+              p: 0.5,
+              color: '#64748b',
+              '&:hover': { color: '#0f172a', bgcolor: '#f1f5f9' },
+            }}
           >
             <MoreHorizRoundedIcon sx={{ fontSize: 16 }} />
           </IconButton>
@@ -273,43 +474,35 @@ export const ProductsPage: React.FC = () => {
   ]
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Header Eyebrow + Title + Category & Status Filters + View Mode + CTA */}
+    <Box sx={{ p: { xs: 2, md: 3 }, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+      {/* Top Header */}
       <Box
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', lg: 'row' },
-          alignItems: { xs: 'flex-start', lg: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'flex-start', sm: 'center' },
           justifyContent: 'space-between',
-          gap: 1.5,
+          gap: 2,
         }}
       >
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: '#64748b', mb: 0.25 }}>
-            <ShoppingCartOutlinedIcon sx={{ fontSize: 16 }} />
-            <Typography variant="caption" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
-              Produtos &gt; Lista
-            </Typography>
-          </Box>
           <Typography
             variant="h1"
             sx={{
-              fontWeight: 800,
-              fontSize: { xs: '1.35rem', sm: '1.6rem' },
+              fontWeight: 700,
+              fontSize: { xs: '1.25rem', sm: '1.375rem' },
               color: '#0f172a',
-              letterSpacing: '-0.03em',
-              my: 0.25,
+              letterSpacing: '-0.02em',
             }}
           >
             Produtos
           </Typography>
-          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
-            Gerencie seu catálogo de produtos, categorias, preços e estoque.
+          <Typography sx={{ color: '#64748b', fontSize: '0.8125rem', mt: 0.25 }}>
+            Gerencie o catálogo, controle de estoque e precificação dos seus produtos
           </Typography>
         </Box>
 
-        {/* Filters and CTA Actions */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
           {/* Category Dropdown */}
           <Select
             value={selectedCategory}
@@ -334,14 +527,26 @@ export const ProductsPage: React.FC = () => {
             }}
           >
             <MenuItem value="Todas as categorias">Todas as categorias</MenuItem>
-            <MenuItem value="Eletrônicos">Eletrônicos</MenuItem>
-            <MenuItem value="Celulares">Celulares</MenuItem>
-            <MenuItem value="Roupas">Roupas</MenuItem>
-            <MenuItem value="Áudio">Áudio</MenuItem>
-            <MenuItem value="Eletrodomésticos">Eletrodomésticos</MenuItem>
-            <MenuItem value="Periféricos">Periféricos</MenuItem>
-            <MenuItem value="Monitores">Monitores</MenuItem>
-            <MenuItem value="Armazenamento">Armazenamento</MenuItem>
+            {categories.length > 0
+              ? categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </MenuItem>
+                ))
+              : [
+                  'Eletrônicos',
+                  'Celulares',
+                  'Roupas',
+                  'Áudio',
+                  'Eletrodomésticos',
+                  'Periféricos',
+                  'Monitores',
+                  'Armazenamento',
+                ].map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
           </Select>
 
           {/* Status Dropdown */}
@@ -414,6 +619,7 @@ export const ProductsPage: React.FC = () => {
           {/* Novo Produto CTA */}
           <Button
             variant="contained"
+            onClick={handleOpenCreateModal}
             startIcon={<AddRoundedIcon />}
             sx={{
               bgcolor: '#2563eb',
@@ -457,36 +663,43 @@ export const ProductsPage: React.FC = () => {
             }}
           >
             <KpiCard
-              label="Total de Produtos"
-              value="128"
-              change="8,3%"
-              caption="em relação ao mês anterior"
-              tone="blue"
+              label={kpis[0]?.label || 'Total de Produtos'}
+              value={kpis[0]?.value || (products.length ? products.length.toString() : '0')}
+              change={kpis[0]?.change || '8,3%'}
+              trendDirection={kpis[0]?.trendDirection || 'up'}
+              caption={kpis[0]?.caption || 'em relação ao mês anterior'}
+              tone={kpis[0]?.tone || 'blue'}
               icon={<Inventory2OutlinedIcon />}
             />
             <KpiCard
-              label="Produtos em Estoque"
-              value="102"
-              change="12,5%"
-              caption="em relação ao mês anterior"
-              tone="blue"
+              label={kpis[1]?.label || 'Produtos em Estoque'}
+              value={kpis[1]?.value || products.filter((p) => p.stock > 10).length.toString()}
+              change={kpis[1]?.change || '12,5%'}
+              trendDirection={kpis[1]?.trendDirection || 'up'}
+              caption={kpis[1]?.caption || 'em relação ao mês anterior'}
+              tone={kpis[1]?.tone || 'blue'}
               icon={<ShoppingCartOutlinedIcon />}
             />
             <KpiCard
-              label="Estoque Crítico"
-              value="8"
-              change="28,6%"
-              caption="em relação ao mês anterior"
-              tone="orange"
+              label={kpis[2]?.label || 'Estoque Crítico'}
+              value={
+                kpis[2]?.value ||
+                products.filter((p) => p.stock > 0 && p.stock <= 10).length.toString()
+              }
+              change={kpis[2]?.change || '28,6%'}
+              trendDirection={kpis[2]?.trendDirection || 'down'}
+              caption={kpis[2]?.caption || 'em relação ao mês anterior'}
+              tone={kpis[2]?.tone || 'orange'}
               isNegative={true}
               icon={<NotificationsActiveOutlinedIcon sx={{ color: '#ef4444' }} />}
             />
             <KpiCard
-              label="Produtos Parados"
-              value="15"
-              change="6,7%"
-              caption="em relação ao mês anterior"
-              tone="blue"
+              label={kpis[3]?.label || 'Produtos Parados'}
+              value={kpis[3]?.value || products.filter((p) => p.stock === 0).length.toString()}
+              change={kpis[3]?.change || '0%'}
+              trendDirection={kpis[3]?.trendDirection || 'up'}
+              caption={kpis[3]?.caption || 'em relação ao mês anterior'}
+              tone={kpis[3]?.tone || 'blue'}
               icon={<PauseCircleOutlineRoundedIcon />}
             />
           </Box>
@@ -502,8 +715,25 @@ export const ProductsPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: 1.5,
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
+            {/* Barra de Progresso Superior quando carregando */}
+            {isLoading && (
+              <LinearProgress
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 3,
+                  bgcolor: '#eff6ff',
+                  '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' },
+                }}
+              />
+            )}
+
             {/* Table Toolbar */}
             <Box
               sx={{
@@ -585,10 +815,11 @@ export const ProductsPage: React.FC = () => {
               </Box>
             </Box>
 
-            {/* Table */}
+            {/* Table com indicador de loading */}
             <DataTable
               columns={columns}
               data={filteredProducts}
+              loading={isLoading}
               keyExtractor={(item) => item.id}
             />
 
@@ -604,60 +835,42 @@ export const ProductsPage: React.FC = () => {
                 gap: 1,
               }}
             >
-              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.6875rem' }}>
-                Mostrando 1-{filteredProducts.length} de 128 produtos
+              <Typography sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                Mostrando{' '}
+                <Box component="span" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                  {filteredProducts.length}
+                </Box>{' '}
+                de{' '}
+                <Box component="span" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                  {products.length}
+                </Box>{' '}
+                produtos
               </Typography>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <IconButton size="small" sx={{ p: 0.5, color: '#94a3b8' }}>
+                <IconButton size="small" disabled sx={{ p: 0.5, color: '#94a3b8' }}>
                   <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
-
-                {[1, 2, 3, 4, 5].map((page) => (
-                  <Box
-                    key={page}
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '4px',
-                      bgcolor: page === 1 ? '#2563eb' : 'transparent',
-                      color: page === 1 ? '#ffffff' : '#64748b',
-                      fontSize: '0.6875rem',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      '&:hover': {
-                        bgcolor: page === 1 ? '#1d4ed8' : '#f1f5f9',
-                      },
-                    }}
-                  >
-                    {page}
-                  </Box>
-                ))}
-
-                <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', px: 0.5 }}>...</Typography>
 
                 <Box
                   sx={{
                     width: 24,
                     height: 24,
                     borderRadius: '4px',
-                    color: '#64748b',
+                    bgcolor: '#2563eb',
+                    color: '#ffffff',
                     fontSize: '0.6875rem',
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    '&:hover': { bgcolor: '#f1f5f9' },
                   }}
                 >
-                  13
+                  1
                 </Box>
 
-                <IconButton size="small" sx={{ p: 0.5, color: '#64748b' }}>
+                <IconButton size="small" disabled sx={{ p: 0.5, color: '#94a3b8' }}>
                   <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Box>
@@ -665,7 +878,7 @@ export const ProductsPage: React.FC = () => {
           </Card>
         </Box>
 
-        {/* Right Column: Product Detail & AI Insights Panel */}
+        {/* Right Column: Product Detail Panel */}
         <Box sx={{ position: { lg: 'sticky' }, top: { lg: 76 } }}>
           <ProductDetailCard
             product={{
@@ -678,18 +891,256 @@ export const ProductsPage: React.FC = () => {
               price: selectedProductForDetail.price,
               status: selectedProductForDetail.status,
               image:
-                selectedProductForDetail.code === 'NT001'
-                  ? '/images/dell_hero.jpg'
-                  : selectedProductForDetail.image,
+                selectedProductForDetail.image ||
+                (selectedProductForDetail as any).imageUrl ||
+                '/images/notebook.jpg',
               description: `${selectedProductForDetail.name}, ideal para trabalho e estudos. Especificações técnicas de alta performance e acabamento premium.`,
               brand: 'Dell',
               model: selectedProductForDetail.name,
               weight: '2,1 kg',
               dimensions: '36 x 24 x 2 cm',
             }}
+            onEdit={() => handleOpenEditModal(selectedProductForDetail)}
           />
         </Box>
       </Box>
+
+      {/* ================= MODAL DE CRIAÇÃO / EDIÇÃO DE PRODUTO ================= */}
+      <Dialog
+        open={isModalOpen}
+        onClose={() => !isSaving && setIsModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.125rem',
+            color: '#0f172a',
+            borderBottom: '1px solid #f1f5f9',
+            pb: 1.5,
+          }}
+        >
+          {isEditing ? 'Editar Produto' : 'Novo Produto'}
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {formError && (
+            <Alert severity="error" sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>
+              {formError}
+            </Alert>
+          )}
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 2 }}>
+            <TextField
+              label="Nome do Produto"
+              size="small"
+              required
+              fullWidth
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Ex: Notebook Dell Inspiron 15"
+            />
+
+            <Select
+              size="small"
+              fullWidth
+              value={formData.category}
+              onChange={(e: SelectChangeEvent) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
+            >
+              {categories.map((c) => (
+                <MenuItem key={c.id} value={c.name}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+
+          <TextField
+            label="Descrição / Especificações"
+            size="small"
+            fullWidth
+            multiline
+            rows={2}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Ex: Intel i5, 8GB RAM, 256GB SSD"
+          />
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr 1fr' },
+              gap: 1.5,
+            }}
+          >
+            <TextField
+              label="Preço (R$)"
+              size="small"
+              required
+              type="number"
+              value={formData.price}
+              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+              placeholder="0.00"
+            />
+
+            <TextField
+              label="Qtd. Estoque"
+              size="small"
+              required
+              type="number"
+              value={formData.stockQuantity}
+              onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+            />
+
+            <TextField
+              label="Código"
+              size="small"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="PRD-001"
+            />
+
+            <TextField
+              label="SKU"
+              size="small"
+              value={formData.sku}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+              placeholder="SKU-001"
+            />
+          </Box>
+
+          {/* Seletor Visual de Imagem */}
+          <Box sx={{ mt: 1 }}>
+            <Typography sx={{ fontSize: '0.8125rem', fontWeight: 600, color: '#334155', mb: 1 }}>
+              Selecione a Imagem do Produto:
+            </Typography>
+
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(75px, 1fr))',
+                gap: 1,
+                maxHeight: 140,
+                overflowY: 'auto',
+                p: 1,
+                bgcolor: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              {AVAILABLE_IMAGES.map((img) => {
+                const isSelected = formData.imageUrl === img.src
+                return (
+                  <Box
+                    key={img.src}
+                    onClick={() => setFormData({ ...formData, imageUrl: img.src })}
+                    sx={{
+                      position: 'relative',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      bgcolor: '#ffffff',
+                      borderRadius: '8px',
+                      p: 0.5,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      transition: 'all 0.15s ease',
+                      '&:hover': { borderColor: '#93c5fd', transform: 'scale(1.02)' },
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src={img.src}
+                      alt={img.label}
+                      onError={(e: any) => {
+                        e.currentTarget.src = '/images/notebook.jpg'
+                      }}
+                      sx={{ width: 44, height: 44, objectFit: 'contain' }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: '0.625rem',
+                        color: isSelected ? '#2563eb' : '#64748b',
+                        fontWeight: isSelected ? 600 : 400,
+                        textAlign: 'center',
+                        mt: 0.25,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        width: '100%',
+                      }}
+                    >
+                      {img.label}
+                    </Typography>
+                    {isSelected && (
+                      <CheckCircleRoundedIcon
+                        sx={{
+                          position: 'absolute',
+                          top: 2,
+                          right: 2,
+                          fontSize: 14,
+                          color: '#2563eb',
+                        }}
+                      />
+                    )}
+                  </Box>
+                )
+              })}
+            </Box>
+
+            {/* Input para URL customizada se desejar */}
+            <TextField
+              label="Ou informe uma URL personalizada para a imagem"
+              size="small"
+              fullWidth
+              value={formData.imageUrl}
+              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              sx={{ mt: 1.5 }}
+            />
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #f1f5f9' }}>
+          <Button
+            onClick={() => setIsModalOpen(false)}
+            disabled={isSaving}
+            sx={{ textTransform: 'none', color: '#64748b' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveProduct}
+            disabled={isSaving}
+            sx={{
+              bgcolor: '#2563eb',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              '&:hover': { bgcolor: '#1d4ed8' },
+            }}
+          >
+            {isSaving ? (
+              <CircularProgress size={20} sx={{ color: '#ffffff' }} />
+            ) : isEditing ? (
+              'Salvar Alterações'
+            ) : (
+              'Cadastrar Produto'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Row Action Dropdown Menu */}
       <Menu
@@ -712,7 +1163,10 @@ export const ProductsPage: React.FC = () => {
         <MenuItem onClick={() => setActionMenuAnchor(null)} sx={{ fontSize: '0.75rem' }}>
           Gerar etiqueta de código de barras
         </MenuItem>
-        <MenuItem onClick={() => setActionMenuAnchor(null)} sx={{ fontSize: '0.75rem', color: '#ef4444' }}>
+        <MenuItem
+          onClick={() => setActionMenuAnchor(null)}
+          sx={{ fontSize: '0.75rem', color: '#ef4444' }}
+        >
           Desativar produto
         </MenuItem>
       </Menu>

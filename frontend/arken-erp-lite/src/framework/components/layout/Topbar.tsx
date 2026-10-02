@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -7,12 +7,18 @@ import {
   Badge,
   Avatar,
   Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  Divider,
 } from '@mui/material'
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded'
-
-import { useLocation } from 'react-router-dom'
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { authService } from '../../../services'
 
 export interface TopbarProps {
   onMobileMenuToggle?: () => void
@@ -26,6 +32,19 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSearch,
 }) => {
   const location = useLocation()
+  const navigate = useNavigate()
+  const [userAnchorEl, setUserAnchorEl] = useState<null | HTMLElement>(null)
+  const storedUser = authService.getStoredUser()
+  const userName = storedUser?.name || 'Lucas Santos'
+  const userRole = storedUser?.role || 'Administrador'
+  const userEmail = storedUser?.email || 'lucas@arken.io'
+
+  const handleLogout = async () => {
+    setUserAnchorEl(null)
+    await authService.logout()
+    navigate('/login')
+  }
+
   const isSales = location.pathname.startsWith('/sales')
   const isProducts = location.pathname.startsWith('/products')
   const isFinance = location.pathname.startsWith('/finance')
@@ -144,6 +163,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         {/* User Profile */}
         <Box
+          onClick={(e) => setUserAnchorEl(e.currentTarget)}
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -159,13 +179,19 @@ export const Topbar: React.FC<TopbarProps> = ({
         >
           <Avatar
             src="/images/lucas_avatar.jpg"
-            alt="Lucas Santos"
+            alt={userName}
             sx={{
               width: 36,
               height: 36,
               border: '1.5px solid #e2e8f0',
+              bgcolor: '#2563eb',
+              color: '#ffffff',
+              fontSize: '0.875rem',
+              fontWeight: 600,
             }}
-          />
+          >
+            {userName.charAt(0).toUpperCase()}
+          </Avatar>
           <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'left' }}>
             <Typography
               sx={{
@@ -175,7 +201,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 lineHeight: 1.2,
               }}
             >
-              Lucas Santos
+              {userName}
             </Typography>
             <Typography
               sx={{
@@ -185,10 +211,61 @@ export const Topbar: React.FC<TopbarProps> = ({
                 mt: 0.25,
               }}
             >
-              Administrador
+              {userRole}
             </Typography>
           </Box>
         </Box>
+
+        {/* User Menu */}
+        <Menu
+          anchorEl={userAnchorEl}
+          open={Boolean(userAnchorEl)}
+          onClose={() => setUserAnchorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: '10px',
+                minWidth: 200,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                mt: 1,
+                p: 0.5,
+              },
+            },
+          }}
+        >
+          <Box sx={{ px: 2, py: 1.2 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>
+              {userName}
+            </Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.2 }}>
+              {userEmail}
+            </Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <MenuItem
+            onClick={() => {
+              setUserAnchorEl(null)
+              navigate('/settings')
+            }}
+            sx={{ fontSize: '0.85rem', gap: 1.2, py: 1 }}
+          >
+            <ListItemIcon sx={{ minWidth: 28, color: '#64748b' }}>
+              <PersonOutlineRoundedIcon sx={{ fontSize: 18 }} />
+            </ListItemIcon>
+            Meu Perfil
+          </MenuItem>
+          <MenuItem
+            onClick={handleLogout}
+            sx={{ fontSize: '0.85rem', gap: 1.2, py: 1, color: '#ef4444' }}
+          >
+            <ListItemIcon sx={{ minWidth: 28, color: '#ef4444' }}>
+              <LogoutRoundedIcon sx={{ fontSize: 18 }} />
+            </ListItemIcon>
+            Sair da Conta
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   )

@@ -116,9 +116,9 @@ export const CustomerDetailCard: React.FC<CustomerDetailCardProps> = ({
       {/* Customer Header Info */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
         {/* Avatar */}
-        {customer.avatarImage ? (
+        {customer.avatarImage || (customer as any).avatarUrl ? (
           <Avatar
-            src={customer.avatarImage}
+            src={customer.avatarImage || (customer as any).avatarUrl}
             alt={customer.name}
             sx={{
               width: 50,

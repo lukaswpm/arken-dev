@@ -1,5 +1,7 @@
 import React from 'react'
 import {
+  Box,
+  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -23,6 +25,7 @@ export interface DataTableProps<T> {
   keyExtractor: (item: T, index: number) => string | number
   emptyMessage?: string
   size?: 'small' | 'medium'
+  loading?: boolean
 }
 
 export function DataTable<T>({
@@ -31,6 +34,7 @@ export function DataTable<T>({
   keyExtractor,
   emptyMessage = 'Nenhum registro encontrado',
   size = 'small',
+  loading = false,
 }: DataTableProps<T>) {
   return (
     <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
@@ -58,7 +62,18 @@ export function DataTable<T>({
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.length === 0 ? (
+          {loading ? (
+            <TableRow>
+              <TableCell colSpan={columns.length} align="center" sx={{ py: 5 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                  <CircularProgress size={24} sx={{ color: '#2563eb' }} />
+                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.8125rem', fontWeight: 500 }}>
+                    Carregando dados...
+                  </Typography>
+                </Box>
+              </TableCell>
+            </TableRow>
+          ) : data.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} align="center" sx={{ py: 3 }}>
                 <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
